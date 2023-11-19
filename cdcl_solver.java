@@ -17,6 +17,14 @@ public class cdcl_solver{
     private static List<HashSet<Integer>> Clauses = new ArrayList< HashSet<Integer>>();
     private static ArrayList<Integer> PartialAssignment = new ArrayList<Integer>();
 
+    // two watch literal structure
+    // which stores the literals in the formula and the clauses that they are being watched in 
+    private static HashMap<Integer,ArrayList<Integer>> Literal_To_Clause= new HashMap<Integer,ArrayList<Integer>>();
+
+    // two watch literal structure 
+    // which stores clauses and the literals in them that are being watched
+    private static HashMap<Integer, int[]> Clause_To_Literal= new HashMap<Integer,int[]>();
+
 
 
     public static void main(String[] args)throws Exception{
@@ -37,6 +45,19 @@ public class cdcl_solver{
         
         // implement pure literal optimisation here
 
+        // initialising two watch literal data structure
+
+        // for(int clause=0;clause<Clauses.size();clause++){
+        //     Integer[] literals = (Integer[])Clauses.get(clause).toArray();
+        //     if (literals.length==1){
+        //         Clause_To_Literal.put(clause,new int[]{literals[0],0});
+        //         Literal_To_Clause.put(literals[0],)
+        //     }
+        //     else{
+        //     Clause_To_Literal.put(clause,new int[]{literals[0],literals[1]});
+        //     }
+        // }
+
         String tree ="B";
         OutputClauses(Clauses);
        // System.out.println(Solve(Clauses,tree));
@@ -54,6 +75,7 @@ public class cdcl_solver{
             SizeOfModelAtDecisionLevel.put(DecisionLevel, PartialAssignment.size());
             DecisionLevel += 1;
            //int decision = Decide();
+           UnitPropogate();
 
         }
         
@@ -63,8 +85,68 @@ public class cdcl_solver{
 
 
     private static void UnitPropogate(){
+        // append to PartialAssignment
+        // append to implication graph
+        // change two-watch literal data structure, if a literal assigned false
+        // if both two watch literals are unassigned, then we have a contradiction 
+        // if only a single two watch literal is unassigned then it is a unit clause
 
+        boolean propogation_complete = false;
         
+        while( !propogation_complete){
+
+            // the affected literal is the negation of the last item we added to the propogation stack
+            // this is the literal that has just been assigned false
+            Integer affected_literal = -PartialAssignment.get(PartialAssignment.size()-1);
+
+            // check the status of every affected clause
+            for( Integer clause_index: Literal_To_Clause.get(affected_literal)){
+
+                Integer watch_literal_1 = Clause_To_Literal.get(clause_index)[0];
+                Integer watch_literal_2 = Clause_To_Literal.get(clause_index)[1];
+
+                
+
+                // is the affected literal a watch literal
+                if( watch_literal_1 == affected_literal ){
+
+                }
+                else if( watch_literal_2 == affected_literal){
+
+                }
+                // the affected literal is not a watch literal for this clause
+                else{
+                    System.out.println("Two watch Data Structure Is Inconsistent");
+                }
+
+
+                
+            }
+
+        }
+    }
+
+    public static  String GetClauseStatus(HashSet clause){
+        
+        return "";
+    }
+
+    // returns the literal in a unit clause if it exists 
+    // 0 otherwise
+    private static Integer FindUnitClauseLiteral(){
+
+        // the literal that has just been made false is the only one we have 
+        // to consider when using two-watch literals
+        Integer literal_made_false = PartialAssignment.get(PartialAssignment.size()-1);
+
+        // when a literal is made false
+        // the clauses where it is a watched literal 
+        // are now either unit clauses
+        // or are conflicts 
+
+
+        return 0;
+
     }
 
     public static void EliminateTautologies(){
