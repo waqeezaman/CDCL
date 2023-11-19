@@ -1,1 +1,1 @@
-java solver
+java cdcl_solver
