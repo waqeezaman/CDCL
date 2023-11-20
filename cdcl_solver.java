@@ -6,12 +6,14 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Queue;
+import java.util.Random;
+import java.util.RandomAccess;
 import java.util.Set;
 
 public class cdcl_solver{
 
-    final String SATISFIABLE = "SATISFIABLE";
-    final String UNSATISFIABLE = "UNSATISFIABLE";
+    final static String SATISFIABLE = "SATISFIABLE";
+    final static String UNSATISFIABLE = "UNSATISFIABLE";
 
     private static int NumVariables;
     private static int NumClauses;
@@ -28,6 +30,7 @@ public class cdcl_solver{
     private static HashMap<Integer, int[]> Clause_To_Literal= new HashMap<Integer,int[]>();
 
 
+    private static HashSet<Integer> alreadydecidedliterals= new HashSet<Integer>();
 
     public static void main(String[] args)throws Exception{
             
@@ -71,23 +74,44 @@ public class cdcl_solver{
         int DecisionLevel = 0;
         HashMap<Integer,Integer> SizeOfModelAtDecisionLevel = new HashMap<Integer,Integer>();
 
+        String status = UnitPropogate();
 
 
-        if ( PartialAssignment.size()< NumVariables){
-            SizeOfModelAtDecisionLevel.put(DecisionLevel, PartialAssignment.size());
-            DecisionLevel += 1;
-           //int decision = Decide();
-           UnitPropogate();
 
-        }
+        do{
+            while(status == "CONFLICT"){
+                if(DecisionLevel==0){
+                    return UNSATISFIABLE;
+                }
+                // analyse conflict
+                int lastdecisionlevel = SizeOfModelAtDecisionLevel.get(DecisionLevel-1);
+                DecisionLevel-=1;
+                PartialAssignment =  new ArrayList<>(PartialAssignment.subList(0,lastdecisionlevel ));
+
+                status = UnitPropogate();
+                
+            }
+
+            if ( PartialAssignment.size()< NumVariables){
+                SizeOfModelAtDecisionLevel.put(DecisionLevel, PartialAssignment.size());
+                DecisionLevel += 1;
+
+                int decision = Decide();
+                AddToPartialAssignment(decision);
+                UnitPropogate();
+
+            }
         
+        }while( PartialAssignment.size()<NumVariables && status!="NO CONFLICT");
 
-        return "";
+        return SATISFIABLE;
     } 
 
     // propogates units until no unit clauses are left 
     // or a conflict is reached 
-    private static HashSet<Integer> UnitPropogate(){
+    // returns conflict if found
+    private static String UnitPropogate(){
+
         // append to PartialAssignment
         // append to implication graph
         // change two-watch literal data structure, if a literal assigned false
@@ -101,7 +125,10 @@ public class cdcl_solver{
 
         boolean propogation_complete = false;
         
-        while( !propogation_complete){
+        while( !literals_to_propogate.isEmpty()){
+
+
+            AddToPartialAssignment(literals_to_propogate.remove());
 
             // the affected literal is the negation of the last item we added to the propogation stack
             // this is the literal that has just been assigned false
@@ -114,62 +141,61 @@ public class cdcl_solver{
                 Integer watch_literal_1 = Clause_To_Literal.get(clause_index)[0];
                 Integer watch_literal_2 = Clause_To_Literal.get(clause_index)[1];
 
-                Integer old_watch_literal_1 = watch_literal_1;
-                Integer old_watch_literal_2 = watch_literal_2;
+                
 
-                // if the watch literals do not have a value try to switch them
-                if( watch_literal_1==0 || watch_literal_1==affected_literal){
-                    watch_literal_1 = SwitchWatchLiteral(watch_literal_1, watch_literal_2, Clauses.get(clause_index))
-                }
-                if(watch_literal_2==0 || watch_literal_2==affected_literal){
-                    watch_literal_2 = SwitchWatchLiteral(watch_literal_2, watch_literal_1, Clauses.get(clause_index))
+
+               // the clause is not a unit clause, and is not a conflict
+                if( watch_literal_1 !=0 && watch_literal_2!=0){
+                    continue;
                 }
 
-
-                // if watch literals have changed
-                // update data structure
-                if( watch_literal_1!= old_watch_literal_1){
-                    Literal_To_Clause.get(old_watch_literal_1).remove(clause_index);
-                    Literal_To_Clause.get(watch_literal_1).add(clause_index);
-                    Clause_To_Literal.get(clause_index)[0] = watch_literal_1;
+                // we have reached a conflict
+                if( watch_literal_1==0 && watch_literal_2 ==0 ) {
+                    return "CONFLICT";
                 }
 
-                if( watch_literal_2!= old_watch_literal_2){
-                    Literal_To_Clause.get(old_watch_literal_1).remove(clause_index);
-                    Literal_To_Clause.get(watch_literal_2).add(clause_index);
-                    Clause_To_Literal.get(clause_index)[1] = watch_literal_2;
+                
+                // we have a unit clause
+                // we need to add the unit to our queue in order to propogate it
+
+                if(watch_literal_1!=0){
+                    literals_to_propogate.add(watch_literal_1);
+                }
+                else if ( watch_literal_2!=0){
+                    literals_to_propogate.add(watch_literal_2);
                 }
 
-           
-
-                // if we have a unit clause
-                if( (watch_literal_1!=0 && watch_literal_2==0)
-                    ||
-                    (watch_literal_1==0 && watch_literal_2!=0)
-                ){
-                    PartialAssignment.
-                }
-                // we have a conflict
-                if( watch_literal_1==0 && watch_literal_2==0){
-
-                }
+                
 
 
                 
             }
 
         }
+        return "NO CONFLICT";
     }
 
-    public static  String GetClauseStatus(HashSet clause){
+    //needs improving
+    private static int Decide(){
+        Random rand = new Random();
+        while(true){
+            int random_literal =  rand.nextInt(2*NumVariables+1)-NumVariables;
+            if( random_literal!=0 && !PartialAssignment.contains(random_literal) 
+                && !PartialAssignment.contains(-random_literal)){
+                    return random_literal;
+                }
+        }
         
-        return "";
     }
 
     // adds a literal to the partial assignment 
     // and updates the two-watch literal data structures
     private static void AddToPartialAssignment(Integer literal){
+
         PartialAssignment.add(literal);
+
+
+        // update two-watch literal data structure 
 
         // this is the literal that has been made false
         Integer affected_literal = -literal;
