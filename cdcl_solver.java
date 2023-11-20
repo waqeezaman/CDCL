@@ -1,9 +1,11 @@
 import java.io.BufferedReader;
 import java.io.InputStreamReader;
+import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Queue;
 import java.util.Set;
 
 public class cdcl_solver{
@@ -83,13 +85,19 @@ public class cdcl_solver{
         return "";
     } 
 
-
-    private static void UnitPropogate(){
+    // propogates units until no unit clauses are left 
+    // or a conflict is reached 
+    private static HashSet<Integer> UnitPropogate(){
         // append to PartialAssignment
         // append to implication graph
         // change two-watch literal data structure, if a literal assigned false
         // if both two watch literals are unassigned, then we have a contradiction 
         // if only a single two watch literal is unassigned then it is a unit clause
+
+        Queue<Integer>  literals_to_propogate = new ArrayDeque<Integer>();
+
+        // initial literal to propogate is the one that was just added to the partial assignment
+        literals_to_propogate.add(PartialAssignment.get(PartialAssignment.size()-1));
 
         boolean propogation_complete = false;
         
@@ -99,24 +107,51 @@ public class cdcl_solver{
             // this is the literal that has just been assigned false
             Integer affected_literal = -PartialAssignment.get(PartialAssignment.size()-1);
 
-            // check the status of every affected clause
+            // check the status of every clause where the affected literal is 
+            // a watch literal 
             for( Integer clause_index: Literal_To_Clause.get(affected_literal)){
 
                 Integer watch_literal_1 = Clause_To_Literal.get(clause_index)[0];
                 Integer watch_literal_2 = Clause_To_Literal.get(clause_index)[1];
 
-                
+                Integer old_watch_literal_1 = watch_literal_1;
+                Integer old_watch_literal_2 = watch_literal_2;
 
-                // is the affected literal a watch literal
-                if( watch_literal_1 == affected_literal ){
-
+                // if the watch literals do not have a value try to switch them
+                if( watch_literal_1==0 || watch_literal_1==affected_literal){
+                    watch_literal_1 = SwitchWatchLiteral(watch_literal_1, watch_literal_2, Clauses.get(clause_index))
                 }
-                else if( watch_literal_2 == affected_literal){
-
+                if(watch_literal_2==0 || watch_literal_2==affected_literal){
+                    watch_literal_2 = SwitchWatchLiteral(watch_literal_2, watch_literal_1, Clauses.get(clause_index))
                 }
-                // the affected literal is not a watch literal for this clause
-                else{
-                    System.out.println("Two watch Data Structure Is Inconsistent");
+
+
+                // if watch literals have changed
+                // update data structure
+                if( watch_literal_1!= old_watch_literal_1){
+                    Literal_To_Clause.get(old_watch_literal_1).remove(clause_index);
+                    Literal_To_Clause.get(watch_literal_1).add(clause_index);
+                    Clause_To_Literal.get(clause_index)[0] = watch_literal_1;
+                }
+
+                if( watch_literal_2!= old_watch_literal_2){
+                    Literal_To_Clause.get(old_watch_literal_1).remove(clause_index);
+                    Literal_To_Clause.get(watch_literal_2).add(clause_index);
+                    Clause_To_Literal.get(clause_index)[1] = watch_literal_2;
+                }
+
+           
+
+                // if we have a unit clause
+                if( (watch_literal_1!=0 && watch_literal_2==0)
+                    ||
+                    (watch_literal_1==0 && watch_literal_2!=0)
+                ){
+                    PartialAssignment.
+                }
+                // we have a conflict
+                if( watch_literal_1==0 && watch_literal_2==0){
+
                 }
 
 
@@ -129,6 +164,61 @@ public class cdcl_solver{
     public static  String GetClauseStatus(HashSet clause){
         
         return "";
+    }
+
+    // adds a literal to the partial assignment 
+    // and updates the two-watch literal data structures
+    private static void AddToPartialAssignment(Integer literal){
+        PartialAssignment.add(literal);
+
+        // this is the literal that has been made false
+        Integer affected_literal = -literal;
+
+        for( Integer clause_index: Literal_To_Clause.get(affected_literal)){
+
+            Integer watch_literal_1 = Clause_To_Literal.get(clause_index)[0];
+            Integer watch_literal_2 = Clause_To_Literal.get(clause_index)[1];
+
+            Integer old_watch_literal_1 = watch_literal_1;
+            Integer old_watch_literal_2 = watch_literal_2;
+
+            // if the watched literal has just been made false or
+            // if the watched literal does not have a value then try to switch it
+            if( watch_literal_1==0 || watch_literal_1==affected_literal){
+                watch_literal_1 = SwitchWatchLiteral(watch_literal_1, watch_literal_2, Clauses.get(clause_index))
+            }
+            if(watch_literal_2==0 || watch_literal_2==affected_literal){
+                watch_literal_2 = SwitchWatchLiteral(watch_literal_2, watch_literal_1, Clauses.get(clause_index))
+            }
+
+
+            // if watch literals have changed
+            // update data structure
+            if( watch_literal_1!= old_watch_literal_1){
+                Literal_To_Clause.get(old_watch_literal_1).remove(clause_index);
+                Literal_To_Clause.get(watch_literal_1).add(clause_index);
+                Clause_To_Literal.get(clause_index)[0] = watch_literal_1;
+            }
+
+            if( watch_literal_2!= old_watch_literal_2){
+                Literal_To_Clause.get(old_watch_literal_1).remove(clause_index);
+                Literal_To_Clause.get(watch_literal_2).add(clause_index);
+                Clause_To_Literal.get(clause_index)[1] = watch_literal_2;
+            }
+        }
+
+
+    }
+
+    // switches the literal being watched to an undefined or true literal
+    // returns 0 if no other valid watch literal exists 
+    private static int SwitchWatchLiteral(Integer current_watch_literal,Integer other_watch_literal,HashSet<Integer> clause){
+        for(int literal: clause){
+            if ( literal!=other_watch_literal && !PartialAssignment.contains(-literal)){
+                return literal;
+            }
+        }
+        return 0;
     }
 
     // returns the literal in a unit clause if it exists 
