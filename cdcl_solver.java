@@ -2,6 +2,7 @@ import java.io.BufferedReader;
 import java.io.InputStreamReader;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -30,7 +31,7 @@ public class cdcl_solver{
     private static HashMap<Integer, int[]> Clause_To_Literal= new HashMap<Integer,int[]>();
 
 
-    private static HashSet<Integer> alreadydecidedliterals= new HashSet<Integer>();
+    private static Queue<Integer> InitialUnits = new ArrayDeque<Integer>();
 
     public static void main(String[] args)throws Exception{
             
@@ -46,38 +47,51 @@ public class cdcl_solver{
 
 
         EliminateTautologies();
-        //Clauses = RemoveAllDoubleLiterals(Clauses);
         
         // implement pure literal optimisation here
 
         // initialising two watch literal data structure
 
-        // for(int clause=0;clause<Clauses.size();clause++){
-        //     Integer[] literals = (Integer[])Clauses.get(clause).toArray();
-        //     if (literals.length==1){
-        //         Clause_To_Literal.put(clause,new int[]{literals[0],0});
-        //         Literal_To_Clause.put(literals[0],)
-        //     }
-        //     else{
-        //     Clause_To_Literal.put(clause,new int[]{literals[0],literals[1]});
-        //     }
-        // }
+        for(int literal=-NumVariables; literal<=NumVariables;literal++){
+            Literal_To_Clause.put(literal,new ArrayList<Integer>());
+        }
+
+        for(int clause=0;clause<Clauses.size();clause++){
+
+            Integer[] literals= new Integer[Clauses.get(clause).size()];
+
+            Clauses.get(clause).toArray(literals);
+
+            if (literals.length==1){
+                InitialUnits.add(literals[0]);
+                Clause_To_Literal.put(clause,new int[]{literals[0],0});
+                Literal_To_Clause.get(literals[0]).add(clause);
+            }
+            else{
+                Clause_To_Literal.put(clause,new int[]{literals[0],literals[1]});
+                Literal_To_Clause.get(literals[0]).add(clause);
+                Literal_To_Clause.get(literals[1]).add(clause);
+
+
+            }
+        }
 
         String tree ="B";
-        OutputClauses(Clauses);
+        //OutputClauses(Clauses);
        // System.out.println(Solve(Clauses,tree));
+       System.out.println(CDCL());
         
         
     }
 
-    private static String CDCL(String Formula){
+    private static String CDCL(){
         int DecisionLevel = 0;
         HashMap<Integer,Integer> SizeOfModelAtDecisionLevel = new HashMap<Integer,Integer>();
 
-        String status = UnitPropogate();
+        String status = UnitPropogate(InitialUnits);
+        System.out.print(status);
 
-
-
+        
         do{
             while(status == "CONFLICT"){
                 if(DecisionLevel==0){
@@ -86,9 +100,11 @@ public class cdcl_solver{
                 // analyse conflict
                 int lastdecisionlevel = SizeOfModelAtDecisionLevel.get(DecisionLevel-1);
                 DecisionLevel-=1;
+                System.out.println("Before Trim "+ PartialAssignment.size());
                 PartialAssignment =  new ArrayList<>(PartialAssignment.subList(0,lastdecisionlevel ));
+                System.out.println("After Trim "+ PartialAssignment.size());
 
-                status = UnitPropogate();
+                status = UnitPropogate(null);
                 
             }
 
@@ -97,12 +113,13 @@ public class cdcl_solver{
                 DecisionLevel += 1;
 
                 int decision = Decide();
+                //System.out.println("Decide level "+ DecisionLevel );
                 AddToPartialAssignment(decision);
-                UnitPropogate();
+                UnitPropogate(null);
 
             }
         
-        }while( PartialAssignment.size()<NumVariables && status!="NO CONFLICT");
+        }while( PartialAssignment.size()!=NumVariables || status=="NO CONFLICT");
 
         return SATISFIABLE;
     } 
@@ -110,23 +127,27 @@ public class cdcl_solver{
     // propogates units until no unit clauses are left 
     // or a conflict is reached 
     // returns conflict if found
-    private static String UnitPropogate(){
+    private static String UnitPropogate(Queue<Integer> units_to_propogate){
 
         // append to PartialAssignment
         // append to implication graph
         // change two-watch literal data structure, if a literal assigned false
         // if both two watch literals are unassigned, then we have a contradiction 
         // if only a single two watch literal is unassigned then it is a unit clause
+        Queue<Integer>  literals_to_propogate;
 
-        Queue<Integer>  literals_to_propogate = new ArrayDeque<Integer>();
+        if(units_to_propogate==null){
+            literals_to_propogate = new ArrayDeque<Integer>();
 
-        // initial literal to propogate is the one that was just added to the partial assignment
-        literals_to_propogate.add(PartialAssignment.get(PartialAssignment.size()-1));
-
-        boolean propogation_complete = false;
+            // initial literal to propogate is the one that was just added to the partial assignment
+            literals_to_propogate.add(PartialAssignment.get(PartialAssignment.size()-1));
+        }else{
+            literals_to_propogate=units_to_propogate;
+        }
+        
         
         while( !literals_to_propogate.isEmpty()){
-
+            //System.out.println("Propogating Literal");
 
             AddToPartialAssignment(literals_to_propogate.remove());
 
@@ -180,6 +201,7 @@ public class cdcl_solver{
         Random rand = new Random();
         while(true){
             int random_literal =  rand.nextInt(2*NumVariables+1)-NumVariables;
+            //System.out.println("rand lit "+ random_literal);
             if( random_literal!=0 && !PartialAssignment.contains(random_literal) 
                 && !PartialAssignment.contains(-random_literal)){
                     return random_literal;
@@ -192,6 +214,7 @@ public class cdcl_solver{
     // and updates the two-watch literal data structures
     private static void AddToPartialAssignment(Integer literal){
 
+        System.out.println("PA SIZE " + PartialAssignment.size());
         PartialAssignment.add(literal);
 
 
@@ -200,7 +223,9 @@ public class cdcl_solver{
         // this is the literal that has been made false
         Integer affected_literal = -literal;
 
-        for( Integer clause_index: Literal_To_Clause.get(affected_literal)){
+        List<Integer> affected_clauses= new ArrayList<Integer>(Literal_To_Clause.get(affected_literal));
+
+        for( Integer clause_index: affected_clauses){
 
             Integer watch_literal_1 = Clause_To_Literal.get(clause_index)[0];
             Integer watch_literal_2 = Clause_To_Literal.get(clause_index)[1];
@@ -211,10 +236,10 @@ public class cdcl_solver{
             // if the watched literal has just been made false or
             // if the watched literal does not have a value then try to switch it
             if( watch_literal_1==0 || watch_literal_1==affected_literal){
-                watch_literal_1 = SwitchWatchLiteral(watch_literal_1, watch_literal_2, Clauses.get(clause_index))
+                watch_literal_1 = SwitchWatchLiteral(watch_literal_1, watch_literal_2, Clauses.get(clause_index));
             }
             if(watch_literal_2==0 || watch_literal_2==affected_literal){
-                watch_literal_2 = SwitchWatchLiteral(watch_literal_2, watch_literal_1, Clauses.get(clause_index))
+                watch_literal_2 = SwitchWatchLiteral(watch_literal_2, watch_literal_1, Clauses.get(clause_index));
             }
 
 
@@ -240,7 +265,7 @@ public class cdcl_solver{
     // returns 0 if no other valid watch literal exists 
     private static int SwitchWatchLiteral(Integer current_watch_literal,Integer other_watch_literal,HashSet<Integer> clause){
         for(int literal: clause){
-            if ( literal!=other_watch_literal && !PartialAssignment.contains(-literal)){
+            if ( literal!=other_watch_literal && !PartialAssignment.contains(-literal) && literal!=current_watch_literal){
                 return literal;
             }
         }
