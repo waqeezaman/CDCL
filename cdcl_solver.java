@@ -2,6 +2,7 @@ import java.io.BufferedReader;
 import java.io.InputStreamReader;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -43,10 +44,11 @@ public class cdcl_solver{
        
 
         
-        OutputClauses(Clauses);
 
 
         EliminateTautologies();
+        OutputClauses(Clauses);
+
         
         // implement pure literal optimisation here
 
@@ -63,7 +65,10 @@ public class cdcl_solver{
             Clauses.get(clause).toArray(literals);
 
             if (literals.length==1){
-                InitialUnits.add(literals[0]);
+                if(!InitialUnits.contains(literals[0])){
+                    InitialUnits.add(literals[0]);
+                    
+                }
                 Clause_To_Literal.put(clause,new int[]{literals[0],0});
                 Literal_To_Clause.get(literals[0]).add(clause);
             }
@@ -77,11 +82,13 @@ public class cdcl_solver{
         }
 
         String tree ="B";
-        //OutputClauses(Clauses);
-       // System.out.println(Solve(Clauses,tree));
+
+       //System.out.println(Clause_To_Literal.toString());
+       System.out.println("Initial Units: "+ InitialUnits.toString());
+
        System.out.println(CDCL());
-        
-        
+      
+
     }
 
     private static String CDCL(){
@@ -89,10 +96,14 @@ public class cdcl_solver{
         HashMap<Integer,Integer> SizeOfModelAtDecisionLevel = new HashMap<Integer,Integer>();
 
         String status = UnitPropogate(InitialUnits);
-        System.out.print(status);
+        System.out.println(status);
 
+        System.out.println(PartialAssignment.size());
+        System.out.println(PartialAssignment);
+        System.out.println(NumVariables);
         
         do{
+            //System.out.println("PARTIAL "+ PartialAssignment.toString());
             while(status == "CONFLICT"){
                 if(DecisionLevel==0){
                     return UNSATISFIABLE;
@@ -100,26 +111,26 @@ public class cdcl_solver{
                 // analyse conflict
                 int lastdecisionlevel = SizeOfModelAtDecisionLevel.get(DecisionLevel-1);
                 DecisionLevel-=1;
-                System.out.println("Before Trim "+ PartialAssignment.size());
+                //System.out.println("Before Trim "+ PartialAssignment.size());
                 PartialAssignment =  new ArrayList<>(PartialAssignment.subList(0,lastdecisionlevel ));
-                System.out.println("After Trim "+ PartialAssignment.size());
+                //System.out.println("After Trim "+ PartialAssignment.size());
 
                 status = UnitPropogate(null);
                 
             }
-
+            System.out.println("Partial Assignment size "+ PartialAssignment.size());
             if ( PartialAssignment.size()< NumVariables){
                 SizeOfModelAtDecisionLevel.put(DecisionLevel, PartialAssignment.size());
                 DecisionLevel += 1;
 
                 int decision = Decide();
                 //System.out.println("Decide level "+ DecisionLevel );
-                AddToPartialAssignment(decision);
-                UnitPropogate(null);
+                //AddToPartialAssignment(decision);
+                UnitPropogate(new ArrayDeque<Integer>(Arrays.asList(decision)));
 
             }
         
-        }while( PartialAssignment.size()!=NumVariables || status=="NO CONFLICT");
+        }while( PartialAssignment.size()!=NumVariables || status=="CONFLICT");
 
         return SATISFIABLE;
     } 
@@ -147,23 +158,32 @@ public class cdcl_solver{
         
         
         while( !literals_to_propogate.isEmpty()){
-            //System.out.println("Propogating Literal");
 
-            AddToPartialAssignment(literals_to_propogate.remove());
 
+            Integer literal_to_propogate = literals_to_propogate.remove();
+            Integer affected_literal = -literal_to_propogate;
+            // System.out.println("Affected Literal: "+ affected_literal);
+            // System.out.println("Before adding unit: ");
+            // OutputWatchedLiterals();
+            ArrayList<Integer> watched_clauses=new ArrayList<Integer>(Literal_To_Clause.get(affected_literal));
+            AddToPartialAssignment(literal_to_propogate);
+            // System.out.println("After adding unit: ");
+            // OutputWatchedLiterals();
             // the affected literal is the negation of the last item we added to the propogation stack
             // this is the literal that has just been assigned false
-            Integer affected_literal = -PartialAssignment.get(PartialAssignment.size()-1);
+
+            
+
 
             // check the status of every clause where the affected literal is 
             // a watch literal 
-            for( Integer clause_index: Literal_To_Clause.get(affected_literal)){
+            for( Integer clause_index: watched_clauses){//Literal_To_Clause.get(affected_literal)){
 
                 Integer watch_literal_1 = Clause_To_Literal.get(clause_index)[0];
                 Integer watch_literal_2 = Clause_To_Literal.get(clause_index)[1];
 
                 
-
+                System.out.println("w1  "+ watch_literal_1 +" :   w2  "+ watch_literal_2);
 
                // the clause is not a unit clause, and is not a conflict
                 if( watch_literal_1 !=0 && watch_literal_2!=0){
@@ -180,10 +200,14 @@ public class cdcl_solver{
                 // we need to add the unit to our queue in order to propogate it
 
                 if(watch_literal_1!=0){
-                    literals_to_propogate.add(watch_literal_1);
+                    if(!PartialAssignment.contains(watch_literal_1)){
+                        literals_to_propogate.add(watch_literal_1);
+                    }
                 }
                 else if ( watch_literal_2!=0){
-                    literals_to_propogate.add(watch_literal_2);
+                    if(!PartialAssignment.contains(watch_literal_2)){
+                        literals_to_propogate.add(watch_literal_2);
+                    }
                 }
 
                 
@@ -214,8 +238,8 @@ public class cdcl_solver{
     // and updates the two-watch literal data structures
     private static void AddToPartialAssignment(Integer literal){
 
-        System.out.println("PA SIZE " + PartialAssignment.size());
         PartialAssignment.add(literal);
+        System.out.println("PA SIZE " + PartialAssignment.size());
 
 
         // update two-watch literal data structure 
@@ -252,12 +276,12 @@ public class cdcl_solver{
             }
 
             if( watch_literal_2!= old_watch_literal_2){
-                Literal_To_Clause.get(old_watch_literal_1).remove(clause_index);
+                Literal_To_Clause.get(old_watch_literal_2).remove(clause_index);
                 Literal_To_Clause.get(watch_literal_2).add(clause_index);
                 Clause_To_Literal.get(clause_index)[1] = watch_literal_2;
             }
         }
-
+        //OutputWatchedLiterals();
 
     }
 
@@ -297,6 +321,7 @@ public class cdcl_solver{
             
             if ( IsTautology(clause) ){
                 Clauses.remove(clause);
+                NumClauses-=1;
                 
             }
         }
@@ -335,8 +360,8 @@ public class cdcl_solver{
 
                     String clauses_vars = line.replace("p cnf","");
                     clauses_vars = clauses_vars.trim();
-                    String clauses = clauses_vars.split(" ")[0];
-                    String vars = clauses_vars.split(" ")[1];
+                    String clauses = clauses_vars.split(" ")[1];
+                    String vars = clauses_vars.split(" ")[0];
                     
                     NumClauses = Integer.parseInt(clauses);
                     NumVariables =Integer.parseInt(vars);
@@ -356,6 +381,7 @@ public class cdcl_solver{
             if (line == null) break;
             
                 String[] vars_in_clause = line.split(" ");
+                System.out.println(line);
                 HashSet<Integer> clause = new HashSet<Integer>();
 
                 for(String s: vars_in_clause){
@@ -370,6 +396,19 @@ public class cdcl_solver{
                 
             
         }
+    }
+
+    private static void OutputWatchedLiterals(){
+        for(int c=0; c<Clauses.size();c++){
+            System.out.println("Clause: " +c);
+
+            for( int literal: Clause_To_Literal.get(c)){
+                System.out.print(literal + " || ");
+            }
+            System.out.println();
+
+        }
+
     }
 
 }
