@@ -10,6 +10,7 @@ import java.util.List;
 import java.util.Queue;
 import java.util.Random;
 import java.util.RandomAccess;
+import java.util.Scanner;
 import java.util.Set;
 
 public class cdcl_solver{
@@ -92,6 +93,8 @@ public class cdcl_solver{
     }
 
     private static String CDCL(){
+
+
         int DecisionLevel = 0;
         HashMap<Integer,Integer> SizeOfModelAtDecisionLevel = new HashMap<Integer,Integer>();
 
@@ -111,25 +114,25 @@ public class cdcl_solver{
                 // analyse conflict
                 int lastdecisionlevel = SizeOfModelAtDecisionLevel.get(DecisionLevel-1);
                 DecisionLevel-=1;
-                //System.out.println("Before Trim "+ PartialAssignment.size());
+                System.out.println("Before Trim "+ PartialAssignment.size());
                 PartialAssignment =  new ArrayList<>(PartialAssignment.subList(0,lastdecisionlevel ));
-                //System.out.println("After Trim "+ PartialAssignment.size());
+                System.out.println("After Trim "+ PartialAssignment.size());
 
                 status = UnitPropogate(null);
                 
             }
-            System.out.println("Partial Assignment size "+ PartialAssignment.size());
+            System.out.println("Partial Assignment  "+ PartialAssignment);
             if ( PartialAssignment.size()< NumVariables){
                 SizeOfModelAtDecisionLevel.put(DecisionLevel, PartialAssignment.size());
                 DecisionLevel += 1;
 
                 int decision = Decide();
-                //System.out.println("Decide level "+ DecisionLevel );
+                System.out.println("Decide level "+ DecisionLevel );
                 //AddToPartialAssignment(decision);
                 UnitPropogate(new ArrayDeque<Integer>(Arrays.asList(decision)));
 
             }
-        
+          
         }while( PartialAssignment.size()!=NumVariables || status=="CONFLICT");
 
         return SATISFIABLE;
@@ -162,13 +165,14 @@ public class cdcl_solver{
 
             Integer literal_to_propogate = literals_to_propogate.remove();
             Integer affected_literal = -literal_to_propogate;
-            // System.out.println("Affected Literal: "+ affected_literal);
-            // System.out.println("Before adding unit: ");
-            // OutputWatchedLiterals();
+            System.out.println("Affected Literal: "+ affected_literal);
+            System.out.println("Before adding unit: ");
+            OutputWatchedLiterals();
             ArrayList<Integer> watched_clauses=new ArrayList<Integer>(Literal_To_Clause.get(affected_literal));
             AddToPartialAssignment(literal_to_propogate);
-            // System.out.println("After adding unit: ");
-            // OutputWatchedLiterals();
+            System.out.println("After adding unit: ");
+            System.out.println("Affected claueses: " + watched_clauses);
+            OutputWatchedLiterals();
             // the affected literal is the negation of the last item we added to the propogation stack
             // this is the literal that has just been assigned false
 
@@ -200,12 +204,12 @@ public class cdcl_solver{
                 // we need to add the unit to our queue in order to propogate it
 
                 if(watch_literal_1!=0){
-                    if(!PartialAssignment.contains(watch_literal_1)){
+                    if(!PartialAssignment.contains(watch_literal_1) && !literals_to_propogate.contains(watch_literal_1)){
                         literals_to_propogate.add(watch_literal_1);
                     }
                 }
                 else if ( watch_literal_2!=0){
-                    if(!PartialAssignment.contains(watch_literal_2)){
+                    if(!PartialAssignment.contains(watch_literal_2)  && !literals_to_propogate.contains(watch_literal_2)){
                         literals_to_propogate.add(watch_literal_2);
                     }
                 }
