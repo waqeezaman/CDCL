@@ -116,9 +116,10 @@ public class cdcl_solver{
                 DecisionLevel-=1;
                 System.out.println("Before Trim "+ PartialAssignment.size());
                 PartialAssignment =  new ArrayList<>(PartialAssignment.subList(0,lastdecisionlevel ));
+                status="NO CONFLICT";
                 System.out.println("After Trim "+ PartialAssignment.size());
 
-                status = UnitPropogate(null);
+                //status = UnitPropogate(null);
                 
             }
             System.out.println("Partial Assignment  "+ PartialAssignment);
@@ -129,7 +130,7 @@ public class cdcl_solver{
                 int decision = Decide();
                 System.out.println("Decide level "+ DecisionLevel );
                 //AddToPartialAssignment(decision);
-                UnitPropogate(new ArrayDeque<Integer>(Arrays.asList(decision)));
+                status=UnitPropogate(new ArrayDeque<Integer>(Arrays.asList(decision)));
 
             }
           
@@ -173,6 +174,7 @@ public class cdcl_solver{
             System.out.println("After adding unit: ");
             System.out.println("Affected claueses: " + watched_clauses);
             OutputWatchedLiterals();
+            System.out.println("Partial Assignment: "+PartialAssignment);
             // the affected literal is the negation of the last item we added to the propogation stack
             // this is the literal that has just been assigned false
 
@@ -196,6 +198,7 @@ public class cdcl_solver{
 
                 // we have reached a conflict
                 if( watch_literal_1==0 && watch_literal_2 ==0 ) {
+                    System.out.println("Conflict Found: "+ clause_index);
                     return "CONFLICT";
                 }
 
