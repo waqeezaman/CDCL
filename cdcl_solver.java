@@ -65,12 +65,14 @@ public class cdcl_solver{
 
             Clauses.get(clause).toArray(literals);
 
+
+            //should just remove unit clauses at this stage, and propogate them 
             if (literals.length==1){
                 if(!InitialUnits.contains(literals[0])){
                     InitialUnits.add(literals[0]);
                     
                 }
-                Clause_To_Literal.put(clause,new int[]{literals[0],0});
+                Clause_To_Literal.put(clause,new int[]{literals[0],literals[0]});
                 Literal_To_Clause.get(literals[0]).add(clause);
             }
             else{
@@ -112,22 +114,31 @@ public class cdcl_solver{
                     return UNSATISFIABLE;
                 }
                 // analyse conflict
-                int lastdecisionlevel = SizeOfModelAtDecisionLevel.get(DecisionLevel-1);
+                System.out.println("partial ass: "+PartialAssignment);
+                System.out.println("d level: "+ DecisionLevel);
+                System.out.println(SizeOfModelAtDecisionLevel);
+                System.out.println(SizeOfModelAtDecisionLevel.get(DecisionLevel));
+                Integer last_decision_index= SizeOfModelAtDecisionLevel.get(DecisionLevel);
+                Integer last_decision = PartialAssignment.get(last_decision_index);//SizeOfModelAtDecisionLevel.get(DecisionLevel));
+                Queue<Integer> units_to_propogate = new ArrayDeque<>();
+                units_to_propogate.add(-last_decision);
+                int lastdecisionlevel = SizeOfModelAtDecisionLevel.get(DecisionLevel);
                 DecisionLevel-=1;
                 System.out.println("Before Trim "+ PartialAssignment.size());
                 PartialAssignment =  new ArrayList<>(PartialAssignment.subList(0,lastdecisionlevel ));
-                status="NO CONFLICT";
+                //status="NO CONFLICT";
                 System.out.println("After Trim "+ PartialAssignment.size());
-
-                //status = UnitPropogate(null);
+                
+                status = UnitPropogate(units_to_propogate);
                 
             }
             System.out.println("Partial Assignment  "+ PartialAssignment);
             if ( PartialAssignment.size()< NumVariables){
-                SizeOfModelAtDecisionLevel.put(DecisionLevel, PartialAssignment.size());
-                DecisionLevel += 1;
 
-                int decision = Decide();
+                DecisionLevel += 1;
+                SizeOfModelAtDecisionLevel.put(DecisionLevel, PartialAssignment.size());
+
+                Integer decision = Decide();
                 System.out.println("Decide level "+ DecisionLevel );
                 //AddToPartialAssignment(decision);
                 status=UnitPropogate(new ArrayDeque<Integer>(Arrays.asList(decision)));
@@ -191,31 +202,56 @@ public class cdcl_solver{
                 
                 System.out.println("w1  "+ watch_literal_1 +" :   w2  "+ watch_literal_2);
 
-               // the clause is not a unit clause, and is not a conflict
-                if( watch_literal_1 !=0 && watch_literal_2!=0){
+
+                String clause_status = GetClauseStatus(watch_literal_1, watch_literal_2);
+
+                if (clause_status=="NO CONFLICT"){
                     continue;
                 }
-
-                // we have reached a conflict
-                if( watch_literal_1==0 && watch_literal_2 ==0 ) {
+                else if (clause_status=="CONFLICT"){
                     System.out.println("Conflict Found: "+ clause_index);
                     return "CONFLICT";
                 }
+                else{
+                    // unit clause found
+                    if(!PartialAssignment.contains(-watch_literal_1)){
+                        if(!PartialAssignment.contains(watch_literal_1) && !literals_to_propogate.contains(watch_literal_1)){
+                            literals_to_propogate.add(watch_literal_1);
+                        }
+                    }
+                    else if ( !PartialAssignment.contains(-watch_literal_2)){
+                        if(!PartialAssignment.contains(watch_literal_2)  && !literals_to_propogate.contains(watch_literal_2)){
+                            literals_to_propogate.add(watch_literal_2);
+                        }
+                    }
+    
+                }
+
+            //    // the clause is not a unit clause, and is not a conflict
+            //     if( watch_literal_1 !=0 && watch_literal_2!=0){
+            //         continue;
+            //     }
+
+            //     // we have reached a conflict
+            //     if( watch_literal_1==0 && watch_literal_2 ==0 ) {
+            //         System.out.println("Conflict Found: "+ clause_index);
+            //         return "CONFLICT";
+            //     }
 
                 
-                // we have a unit clause
-                // we need to add the unit to our queue in order to propogate it
+            //     // we have a unit clause
+            //     // we need to add the unit to our queue in order to propogate it
 
-                if(watch_literal_1!=0){
-                    if(!PartialAssignment.contains(watch_literal_1) && !literals_to_propogate.contains(watch_literal_1)){
-                        literals_to_propogate.add(watch_literal_1);
-                    }
-                }
-                else if ( watch_literal_2!=0){
-                    if(!PartialAssignment.contains(watch_literal_2)  && !literals_to_propogate.contains(watch_literal_2)){
-                        literals_to_propogate.add(watch_literal_2);
-                    }
-                }
+            //     if(watch_literal_1!=0){
+            //         if(!PartialAssignment.contains(watch_literal_1) && !literals_to_propogate.contains(watch_literal_1)){
+            //             literals_to_propogate.add(watch_literal_1);
+            //         }
+            //     }
+            //     else if ( watch_literal_2!=0){
+            //         if(!PartialAssignment.contains(watch_literal_2)  && !literals_to_propogate.contains(watch_literal_2)){
+            //             literals_to_propogate.add(watch_literal_2);
+            //         }
+            //     }
 
                 
 
@@ -292,15 +328,29 @@ public class cdcl_solver{
 
     }
 
+    // gets the status of a clause {satisfied, conflict, unit}
+    // based on the watch literals
+    private static String GetClauseStatus(Integer w1,Integer w2){
+        if( PartialAssignment.contains(-w1) && PartialAssignment.contains(-w2)){
+            return "CONFLICT";
+        }
+        else if(!PartialAssignment.contains(-w1) && !PartialAssignment.contains(-w2)){
+            return "NO CONFLICT";
+        }
+        else{
+            return "UNIT";
+        }
+    }
+
     // switches the literal being watched to an undefined or true literal
-    // returns 0 if no other valid watch literal exists 
+    // returns the same value if no other valid watch literal exists 
     private static int SwitchWatchLiteral(Integer current_watch_literal,Integer other_watch_literal,HashSet<Integer> clause){
         for(int literal: clause){
             if ( literal!=other_watch_literal && !PartialAssignment.contains(-literal) && literal!=current_watch_literal){
                 return literal;
             }
         }
-        return 0;
+        return current_watch_literal;
     }
 
     // returns the literal in a unit clause if it exists 
