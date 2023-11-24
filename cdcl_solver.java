@@ -17,7 +17,6 @@ public class cdcl_solver{
     final static String UNSATISFIABLE = "UNSATISFIABLE";
     final static String CONFLICT ="CONFLICT";
     final static String NOCONFLICT="NOCONFLICT";
-
     final static String UNIT ="UNIT";
     
 
@@ -38,16 +37,13 @@ public class cdcl_solver{
 
     private static Queue<Integer> InitialUnits = new ArrayDeque<Integer>();
 
+
+    private static graph ImplicationGraph = new graph();
+
     public static void main(String[] args)throws Exception{
             
         
         ReadClauses();
-
-        
-
-       
-
-        
 
 
         EliminateTautologies();
@@ -110,7 +106,7 @@ public class cdcl_solver{
                 // analyse conflict
                
                 Integer last_decision_index= SizeOfModelAtDecisionLevel.get(DecisionLevel);
-                Integer last_decision = PartialAssignment.get(last_decision_index);//SizeOfModelAtDecisionLevel.get(DecisionLevel));
+                Integer last_decision = PartialAssignment.get(last_decision_index);
 
                 Queue<Integer> units_to_propogate = new ArrayDeque<>();
                 units_to_propogate.add(-last_decision);
@@ -130,7 +126,10 @@ public class cdcl_solver{
                 SizeOfModelAtDecisionLevel.put(DecisionLevel, PartialAssignment.size());
 
                 Integer decision = Decide();
-               
+
+                // add decision to implication graph 
+                ImplicationGraph.Graph.add(new vertex(decision,DecisionLevel));
+
                 status=UnitPropogate(new ArrayDeque<Integer>(Arrays.asList(decision)));
 
             }
@@ -152,17 +151,6 @@ public class cdcl_solver{
         // if only a single two watch literal is unassigned then it is a unit clause
   
   
-        // Queue<Integer>  literals_to_propogate;
-
-        // if(units_to_propogate==null){
-        //     literals_to_propogate = new ArrayDeque<Integer>();
-
-        //     // initial literal to propogate is the one that was just added to the partial assignment
-        //     literals_to_propogate.add(PartialAssignment.get(PartialAssignment.size()-1));
-        // }else{
-        //     literals_to_propogate=units_to_propogate;
-        // }
-        
         
         while( !literals_to_propogate.isEmpty()){
 
@@ -171,6 +159,7 @@ public class cdcl_solver{
             Integer affected_literal = -literal_to_propogate;
          
             ArrayList<Integer> watched_clauses=new ArrayList<Integer>(Literal_To_Clause.get(affected_literal));
+
             AddToPartialAssignment(literal_to_propogate);
             
             // the affected literal is the negation of the last item we added to the propogation stack
@@ -253,11 +242,18 @@ public class cdcl_solver{
         
 
 
-        // update two-watch literal data structure 
+       
 
         // this is the literal that has been made false
         Integer affected_literal = -literal;
 
+        UpdateWatchedLiterals(affected_literal);
+        
+
+
+    }
+
+    private static void UpdateWatchedLiterals(Integer affected_literal ){
         List<Integer> affected_clauses= new ArrayList<Integer>(Literal_To_Clause.get(affected_literal));
 
         for( Integer clause_index: affected_clauses){
@@ -293,10 +289,7 @@ public class cdcl_solver{
             }
         }
 
-        
-
-
-    }
+    } 
 
     // gets the status of a clause {satisfied, conflict, unit}
     // based on the watch literals
